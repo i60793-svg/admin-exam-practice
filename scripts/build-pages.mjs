@@ -1,0 +1,33 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+const root=path.resolve(import.meta.dirname,'..');process.chdir(root);
+fs.mkdirSync('worker',{recursive:true});
+execFileSync('python3',['scripts/build-worker.py'],{stdio:'inherit'});
+const source=fs.readFileSync('worker/index.js','utf8');
+const worker=(await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'))).default;
+const request=p=>worker.fetch(new Request('https://export.invalid'+p),{});
+let page=await (await request('/')).text();
+const bankPath=page.match(/fetch\("([^"]+)"\)/)[1];
+const clientPath=page.match(/src="(\/app\.[^"]+\.js)"/)[1];
+const bank=await (await request(bankPath)).text();
+const client=(await (await request(clientPath)).text()).replaceAll(bankPath,'.'+bankPath);
+const hash=createHash('sha256').update(client).digest('hex').slice(0,16);
+const newClient='./app.'+hash+'.js';
+page=page.replaceAll(clientPath,newClient).replaceAll(bankPath,'.'+bankPath).replaceAll('href="/icons/','href="./icons/').replaceAll('href="/site.webmanifest"','href="./site.webmanifest"');
+fs.rmSync('docs',{recursive:true,force:true});
+fs.mkdirSync('docs/api',{recursive:true});fs.mkdirSync('docs/icons',{recursive:true});
+fs.writeFileSync('docs/index.html',page);fs.writeFileSync('docs/'+newClient.slice(2),client);fs.writeFileSync('docs'+bankPath,bank);
+for(const name of fs.readdirSync('assets'))if(name.startsWith('planet-'))fs.copyFileSync('assets/'+name,'docs/icons/'+name);
+const manifest=JSON.parse(fs.readFileSync('assets/site.webmanifest'));manifest.id='./';manifest.start_url='./';manifest.scope='./';manifest.icons.forEach(i=>i.src='.'+i.src);
+fs.writeFileSync('docs/site.webmanifest',JSON.stringify(manifest,null,2));fs.writeFileSync('docs/.nojekyll','');
+for(const match of page.matchAll(/(?:src|href)="([^"#]+)"/g)){
+ const url=match[1];if(/^(https?:|data:)/.test(url))continue;
+ if(!url.startsWith('./'))throw Error('Root-relative asset: '+url);
+ if(!fs.existsSync(path.join('docs',url)))throw Error('Missing asset: '+url);
+ if(!new URL(url,'https://example.github.io/project-name/').pathname.startsWith('/project-name/'))throw Error('Escaped project scope');
+}
+if(client.includes('__BANK_URL__'))throw Error('Unresolved bank URL');
+JSON.parse(bank);
+console.log('PASS: GitHub Pages project-relative assets, manifest and complete question bank.');

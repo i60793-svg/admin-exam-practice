@@ -1,0 +1,25 @@
+{
+  "id": "/",
+  "name": "行政日課",
+  "short_name": "行政日課",
+  "lang": "zh-Hant",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#2b2e49",
+  "theme_color": "#2b2e49",
+  "icons": [
+    {
+      "src": "/icons/planet-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/planet-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
